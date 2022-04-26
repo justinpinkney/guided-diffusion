@@ -32,12 +32,13 @@ def main():
     schedule_sampler = create_named_schedule_sampler(args.schedule_sampler, diffusion)
 
     logger.log("creating data loader...")
-    data = load_superres_data(
-        args.data_dir,
-        args.batch_size,
-        large_size=args.large_size,
-        small_size=args.small_size,
+    data = load_data(
+        data_dir=args.data_dir,
+        batch_size=args.batch_size,
+        image_size=args.large_size,
         class_cond=args.class_cond,
+        out_size=args.large_size,
+        num_workers=args.num_workers,
     )
 
     logger.log("training...")
@@ -68,8 +69,10 @@ def load_superres_data(data_dir, batch_size, large_size, small_size, class_cond=
         class_cond=class_cond,
     )
     for large_batch, model_kwargs in data:
-        model_kwargs["low_res"] = F.interpolate(large_batch, small_size, mode="area")
-        yield large_batch, model_kwargs
+        #FIXME
+        out = degradation_bsrgan_plus(large_batch.numpy(), sf=4, lq_patchsize=small_size)
+        model_kwargs["low_res"] = out[0]
+        yield out[1], model_kwargs
 
 
 def create_argparser():
@@ -87,6 +90,7 @@ def create_argparser():
         resume_checkpoint="",
         use_fp16=False,
         fp16_scale_growth=1e-3,
+        num_workers=8,
     )
     defaults.update(sr_model_and_diffusion_defaults())
     parser = argparse.ArgumentParser()

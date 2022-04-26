@@ -7,6 +7,8 @@ from mpi4py import MPI
 import numpy as np
 from torch.utils.data import DataLoader, Dataset
 
+from guided_diffusion.image_degradation.bsrgan import degradation_bsrgan
+
 
 def load_data(
     *,
@@ -17,6 +19,8 @@ def load_data(
     deterministic=False,
     random_crop=False,
     random_flip=True,
+    out_size=None,
+    num_workers=1,
 ):
     """
     For a dataset, create a generator over (images, kwargs) pairs.
@@ -54,14 +58,15 @@ def load_data(
         num_shards=MPI.COMM_WORLD.Get_size(),
         random_crop=random_crop,
         random_flip=random_flip,
+        out_size=out_size,
     )
     if deterministic:
         loader = DataLoader(
-            dataset, batch_size=batch_size, shuffle=False, num_workers=1, drop_last=True
+            dataset, batch_size=batch_size, shuffle=False, num_workers=num_workers, drop_last=True
         )
     else:
         loader = DataLoader(
-            dataset, batch_size=batch_size, shuffle=True, num_workers=1, drop_last=True
+            dataset, batch_size=batch_size, shuffle=True, num_workers=num_workers, drop_last=True
         )
     while True:
         yield from loader
@@ -89,6 +94,7 @@ class ImageDataset(Dataset):
         num_shards=1,
         random_crop=False,
         random_flip=True,
+        out_size=None,
     ):
         super().__init__()
         self.resolution = resolution
@@ -96,6 +102,7 @@ class ImageDataset(Dataset):
         self.local_classes = None if classes is None else classes[shard:][::num_shards]
         self.random_crop = random_crop
         self.random_flip = random_flip
+        self.out_size = out_size
 
     def __len__(self):
         return len(self.local_images)
@@ -107,19 +114,28 @@ class ImageDataset(Dataset):
             pil_image.load()
         pil_image = pil_image.convert("RGB")
 
-        if self.random_crop:
-            arr = random_crop_arr(pil_image, self.resolution)
+        if self.out_size:
+            out = degradation_bsrgan(np.array(pil_image)/255, sf=2, lq_patchsize=self.out_size//2)
+            arr = out[1]
         else:
-            arr = center_crop_arr(pil_image, self.resolution)
+            if self.random_crop:
+                arr = random_crop_arr(pil_image, self.resolution)
+            else:
+                arr = center_crop_arr(pil_image, self.resolution)
 
         if self.random_flip and random.random() < 0.5:
             arr = arr[:, ::-1]
+            if self.out_size:
+                #FIXME
+                out = [out[0][:, ::-1].copy()]
 
-        arr = arr.astype(np.float32) / 127.5 - 1
+        arr = arr.astype(np.float32)# / 127.5 - 1
 
         out_dict = {}
         if self.local_classes is not None:
             out_dict["y"] = np.array(self.local_classes[idx], dtype=np.int64)
+        if self.out_size:
+            out_dict["low_res"] = np.transpose(out[0], [2,0,1])
         return np.transpose(arr, [2, 0, 1]), out_dict
 
 
