@@ -18,8 +18,10 @@ def load_data(
     class_cond=False,
     deterministic=False,
     random_crop=False,
+    random_resize=False,
     random_flip=True,
     out_size=None,
+    scale_factor=2,
     num_workers=1,
 ):
     """
@@ -59,6 +61,8 @@ def load_data(
         random_crop=random_crop,
         random_flip=random_flip,
         out_size=out_size,
+        random_resize=random_resize,
+        scale_factor=scale_factor,
     )
     if deterministic:
         loader = DataLoader(
@@ -94,7 +98,9 @@ class ImageDataset(Dataset):
         num_shards=1,
         random_crop=False,
         random_flip=True,
+        random_resize=False,
         out_size=None,
+        scale_factor=None,
     ):
         super().__init__()
         self.resolution = resolution
@@ -102,7 +108,9 @@ class ImageDataset(Dataset):
         self.local_classes = None if classes is None else classes[shard:][::num_shards]
         self.random_crop = random_crop
         self.random_flip = random_flip
+        self.random_resize = random_resize
         self.out_size = out_size
+        self.scale_factor = scale_factor
 
     def __len__(self):
         return len(self.local_images)
@@ -114,14 +122,19 @@ class ImageDataset(Dataset):
             pil_image.load()
         pil_image = pil_image.convert("RGB")
 
-        if self.out_size:
-            out = degradation_bsrgan(np.array(pil_image)/255, sf=2, lq_patchsize=self.out_size//2)
-            arr = out[1]
+        if self.random_resize:
+            orig_size = pil_image.size[0]
+            resize_size = int(np.random.rand()*(orig_size - self.resolution) + self.resolution)
+            pil_image = pil_image.resize((resize_size, resize_size))
+
+        if self.random_crop:
+            arr = random_crop_arr(pil_image, self.resolution)
         else:
-            if self.random_crop:
-                arr = random_crop_arr(pil_image, self.resolution)
-            else:
-                arr = center_crop_arr(pil_image, self.resolution)
+            arr = center_crop_arr(pil_image, self.resolution)
+
+        if self.out_size:
+            out = degradation_bsrgan(arr/255, sf=self.scale_factor, lq_patchsize=self.out_size//self.scale_factor)
+            arr = out[1]
 
         if self.random_flip and random.random() < 0.5:
             arr = arr[:, ::-1]
