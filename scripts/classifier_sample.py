@@ -69,8 +69,8 @@ def main():
     all_labels = []
     while len(all_images) * args.batch_size < args.num_samples:
         model_kwargs = {}
-        classes = th.randint(
-            low=0, high=NUM_CLASSES, size=(args.batch_size,), device=dist_util.dev()
+        classes = 981*th.ones(
+            size=(args.batch_size,), device=dist_util.dev(), dtype=th.long
         )
         model_kwargs["y"] = classes
         sample_fn = (
