@@ -1,0 +1,18 @@
+model:
+  attention_resolutions: 32,16,8
+  diffusion_steps: 1000
+  learn_sigma: True 
+  noise_schedule: linear
+  num_channels: 192 
+  num_head_channels: 64 
+  num_res_blocks: 2
+  resblock_updown: True 
+  use_fp16: True 
+  use_scale_shift_norm: True 
+  class_cond: False
+  large_size: 256 
+  small_size: 128
+train:
+  lr: 0.5e-4 
+  batch_size: 8 
+  save_interval: 1000
