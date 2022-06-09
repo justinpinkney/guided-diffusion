@@ -1,4 +1,5 @@
 import copy
+from datetime import datetime
 import functools
 import os
 
@@ -106,6 +107,8 @@ class TrainLoop:
                 )
             self.use_ddp = False
             self.ddp_model = self.model
+
+        self.start_time = datetime.now()
 
     def _load_and_sync_parameters(self):
         resume_checkpoint = find_resume_checkpoint() or self.resume_checkpoint
@@ -228,6 +231,7 @@ class TrainLoop:
     def log_step(self):
         logger.logkv("step", self.step + self.resume_step)
         logger.logkv("samples", (self.step + self.resume_step + 1) * self.global_batch)
+        logger.logkv("time", f"{datetime.now() - self.start_time}")
 
     def save(self):
         def save_checkpoint(rate, params):

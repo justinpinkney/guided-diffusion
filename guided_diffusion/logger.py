@@ -403,10 +403,9 @@ class Logger(object):
 def get_rank_without_mpi_import():
     # check environment variables here instead of importing mpi4py
     # to avoid calling MPI_Init() when this module is imported
-    for varname in ["PMI_RANK", "OMPI_COMM_WORLD_RANK"]:
-        if varname in os.environ:
-            return int(os.environ[varname])
-    return 0
+    #for varname in ["PMI_RANK", "OMPI_COMM_WORLD_RANK"]:
+    #    if varname in os.environ:
+    return int(os.environ["LOCAL_RANK"])
 
 
 def mpi_weighted_mean(comm, local_name2valcount):

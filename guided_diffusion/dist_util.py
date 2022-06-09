@@ -7,7 +7,6 @@ import os
 import socket
 
 import blobfile as bf
-from mpi4py import MPI
 import torch as th
 import torch.distributed as dist
 
@@ -24,22 +23,12 @@ def setup_dist():
     """
     if dist.is_initialized():
         return
-    os.environ["CUDA_VISIBLE_DEVICES"] = f"{MPI.COMM_WORLD.Get_rank() % GPUS_PER_NODE}"
 
-    comm = MPI.COMM_WORLD
-    backend = "gloo" if not th.cuda.is_available() else "nccl"
+    backend = "nccl"
 
-    if backend == "gloo":
-        hostname = "localhost"
-    else:
-        hostname = socket.gethostbyname(socket.getfqdn())
-    os.environ["MASTER_ADDR"] = comm.bcast(hostname, root=0)
-    os.environ["RANK"] = str(comm.rank)
-    os.environ["WORLD_SIZE"] = str(comm.size)
-
-    port = comm.bcast(_find_free_port(), root=0)
-    os.environ["MASTER_PORT"] = str(port)
-    dist.init_process_group(backend=backend, init_method="env://")
+    local_rank = int(os.environ["LOCAL_RANK"])
+    th.cuda.set_device(local_rank)
+    dist.init_process_group(backend=backend)
 
 
 def dev():
