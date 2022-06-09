@@ -18,6 +18,8 @@ from guided_diffusion.train_util import TrainLoop
 
 def main():
     args = create_argparser().parse_args()
+    import os
+    os.environ["LOCAL_RANK"] = str(args.local_rank)
 
     dist_util.setup_dist()
     logger.configure()
@@ -76,6 +78,7 @@ def create_argparser():
     defaults.update(model_and_diffusion_defaults())
     parser = argparse.ArgumentParser()
     add_dict_to_argparser(parser, defaults)
+    parser.add_argument("--local_rank", type=int)
     return parser
 
 
